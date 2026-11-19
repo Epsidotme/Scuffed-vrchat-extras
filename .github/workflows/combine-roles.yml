@@ -1,0 +1,40 @@
+name: Combine role lists
+
+# Rebuilds roles/all.txt (every role list in one file) whenever a role file changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "roles/**"
+      - "!roles/all.txt"
+      - ".github/scripts/combine-roles.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: combine-roles
+  cancel-in-progress: false
+
+jobs:
+  combine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build roles/all.txt
+        run: bash .github/scripts/combine-roles.sh
+
+      - name: Commit if it changed
+        run: |
+          if git diff --quiet -- roles/all.txt && git ls-files --error-unmatch roles/all.txt >/dev/null 2>&1; then
+            echo "roles/all.txt is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add roles/all.txt
+          git commit -m "Rebuild roles/all.txt"
+          git pull --rebase origin main
+          git push origin HEAD:main
